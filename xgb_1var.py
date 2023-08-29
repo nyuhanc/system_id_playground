@@ -1,6 +1,3 @@
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,7 +20,7 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 3
-# target = 'xmeas_2'
+# targets = 'xmeas_2'
 targets = [f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
@@ -41,6 +38,9 @@ for var in xmv_variables:
 
 # Drop missing values (due to lagged features creation)
 df = df_train.dropna()
+
+# Defragment the dataframe
+df_train = df_train.copy()
 
 # Train-test split (80/20)
 train_size = int(0.8 * len(df))
