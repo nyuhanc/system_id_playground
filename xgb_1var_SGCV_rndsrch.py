@@ -60,11 +60,11 @@ model = xgb.XGBRegressor()
 
 # Define parameter grid
 param_grid = {
-    'n_estimators': [100, 150, 200, 250, 300],
-    'max_depth': [1, 2, 3, 4, 5, 6, 7, 8],
-    'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2],
-    'sub': [0.5, 0.75, 1], # subsample
-    'colsample_bytree': [0.5, 0.7, 0.9],
+    'n_estimators': [100, 150, 200, 250, 300], # [100, 150, 200, 250, 300]
+    'max_depth': [1, 2, 3, 4, 5, 6, 7, 8], # [1, 2, 3, 4, 5, 6, 7, 8]
+    'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2], # [0.01, 0.05, 0.1, 0.15, 0.2]
+    'sub': [0.5, 0.75, 1], # [0.5, 0.75, 1] subsample
+    'colsample_bytree': [0.5, 0.7, 0.9], # [0.5, 0.7, 0.9]
 }
 
 # Instantiate the grid search model
@@ -72,8 +72,8 @@ grid_search = RandomizedSearchCV(
     estimator=model,
     param_distributions=param_grid,
     n_iter=100,
-    scoring='mean_squared_error',
-    n_jobs=-1,
+    scoring='neg_mean_squared_error',
+    n_jobs=-2,
     cv=5,
     verbose=3,
 )
@@ -95,7 +95,7 @@ print('with score: ', grid_search.best_score_)
 # Save results to csv, add a unique 3-digit timestamp to the filename
 timestr = time.strftime("%m%d-%H%M")
 results = pd.DataFrame(grid_search.cv_results_)
-results.to_csv(f'results/xgb_SGCVres_{timestr}_{target}.csv', index=False)
+results.to_csv(f'results/xgb_SGCVres_({timestr})_{target}.csv', index=False)
 
 
 

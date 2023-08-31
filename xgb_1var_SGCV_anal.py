@@ -8,8 +8,12 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
+
+# --- ANALYSIS OF THE RESULTS OF THE GRID SEARCH CROSS VALIDATION -------
+# --- (PRIMARY ANALYSIS) ------------------------------------------------
+
 # Load SearchGridCV results (RandomizedSearchCV)
-table_name = 'xgb_SGCV_0829-1301_xmeas_2.csv'
+table_name = 'xgb_SGCV_(0829-1301)_xmeas_2.csv'
 df = pd.read_csv(f'results/{table_name}')
 
 # Extract the best parameters
@@ -41,6 +45,13 @@ pd.set_option('display.max_colwidth', None)
 df.sort_values(by='mean_test_score', ascending=False, inplace=True)
 # print the first five rows
 print(df[['params', 'mean_test_score']].head(10))
+
+# --- ANALYSIS OF THE RESULTS OF THE GRID SEARCH CROSS VALIDATION -------
+# --- (DEPENDENCE OF LOSS ON TWO HYPERS. WHILE OTHERS BEING FIXED) ------
+
+# For the time being in xgb_1var_SGCV_2by2.py
+
+
 
 
 

@@ -19,9 +19,8 @@ def normalize_data(df):
     return df
 
 # Parameters
-n_lags = 3
-# targets = 'xmeas_2'
-targets = [f'xmeas_{i}' for i in range(1, 41+1)]
+n_lags = 30
+targets = ['xmeas_38'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -59,15 +58,16 @@ for target in targets:
     y_test = test_df[target]
 
     # Create XGBoost model
+    # Create XGBoost model
     model = xgb.XGBRegressor(
-        n_estimators=150,
+        n_estimators=300,
         learning_rate=0.2,
         objective='reg:squarederror',
-        max_depth=5,
+        max_depth=8,
         max_leaves=None,
         max_bin=None,
         grow_policy=None,
-        verbosity=None,
+        verbosity=3,
         booster=None,
         tree_method=None,
         gamma=None,
@@ -75,7 +75,7 @@ for target in targets:
         max_delta_step=None,
         subsample=None,
         sampling_method=None,
-        colsample_bytree=None,
+        colsample_bytree=0.9,
         colsample_bylevel=None,
         colsample_bynode=None,
         reg_alpha=None,
@@ -144,11 +144,11 @@ for target in targets:
 
     # Add grid, legend, and RMSE text
     ax.grid(True)
-    ax.legend()
+    ax.legend(loc=1)
     ax.text(0.985, 0.02, f'RMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/xgb_1var_{target:02}_n_lags_{n_lags}.png')
+    plt.savefig(f'plots/xgb_1var_{target:02}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
     # Show the plot
     plt.show()
