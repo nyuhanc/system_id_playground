@@ -1,3 +1,5 @@
+# Experimental setup
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,7 +22,11 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 3
-targets = ['xmeas_38'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+targets = [f'xmeas_{i}' for i in range(1, 21+1)] # ['xmeas_2']
+# We are going to include some of the target variables as predictors
+target_predictors = ['xmeas_1', 'xmeas_10', 'xmeas_12', 'xmeas_15', 'xmeas_17']
+# Exclude target_predictors from targets
+targets = [target for target in targets if target not in target_predictors]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -30,6 +36,7 @@ for target in targets:
 
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
+xmv_variables.extend(target_predictors)
 
 for var in xmv_variables:
     for lag in range(1, n_lags + 1):
@@ -60,44 +67,44 @@ for target in targets:
     # Create XGBoost model
     # Create XGBoost model
     model = xgb.XGBRegressor(
-        n_estimators=300,
-        learning_rate=0.2,
-        objective='reg:squarederror',
-        max_depth=8,
-        max_leaves=None,
-        max_bin=None,
-        grow_policy=None,
-        verbosity=3,
-        booster=None,
-        tree_method=None,
-        gamma=1, # min_split_loss
-        min_child_weight=3,
-        max_delta_step=None,
-        subsample=None,
-        sampling_method=None,
-        colsample_bytree=0.9,
-        colsample_bylevel=None,
-        colsample_bynode=None,
-        reg_alpha=None, #0.1,
-        reg_lambda=None,#10,
-        scale_pos_weight=None,
-        base_score=None,
-        num_parallel_tree=None,
-        random_state=None,
-        n_jobs=None,
-        monotone_constraints=None,
-        interaction_constraints=None,
-        importance_type=None,
-        gpu_id=None,
-        validate_parameters=None,
-        predictor=None,
-        enable_categorical=False,
-        feature_types=None,
-        max_cat_to_onehot=None,
-        max_cat_threshold=None,
-        eval_metric=None,
-        early_stopping_rounds=None,
-        callbacks=None,
+        # n_estimators=300,
+        # learning_rate=0.2,
+        # objective='reg:squarederror',
+        # max_depth=8,
+        # max_leaves=None,
+        # max_bin=None,
+        # grow_policy=None,
+        # verbosity=3,
+        # booster=None,
+        # tree_method=None,
+        # gamma=1, # min_split_loss
+        # min_child_weight=3,
+        # max_delta_step=None,
+        # subsample=None,
+        # sampling_method=None,
+        # colsample_bytree=0.9,
+        # colsample_bylevel=None,
+        # colsample_bynode=None,
+        # reg_alpha=None, #0.1,
+        # reg_lambda=None,#10,
+        # scale_pos_weight=None,
+        # base_score=None,
+        # num_parallel_tree=None,
+        # random_state=None,
+        # n_jobs=None,
+        # monotone_constraints=None,
+        # interaction_constraints=None,
+        # importance_type=None,
+        # gpu_id=None,
+        # validate_parameters=None,
+        # predictor=None,
+        # enable_categorical=False,
+        # feature_types=None,
+        # max_cat_to_onehot=None,
+        # max_cat_threshold=None,
+        # eval_metric=None,
+        # early_stopping_rounds=None,
+        # callbacks=None,
     )
 
 
