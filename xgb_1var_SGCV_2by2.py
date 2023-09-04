@@ -1,4 +1,5 @@
-# Hyperparameter tuning using scikit-learn GridSearchCV
+# Hyperparameter tuning using scikit-learn GridSearchCV (varying two hypers at others fixed at optimal values
+# found by RandomizedSearchCV)
 
 import time
 
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')

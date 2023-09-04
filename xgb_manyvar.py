@@ -1,3 +1,5 @@
+# Description: XGBoost model for multiple targets
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,9 +21,9 @@ def normalize_data(df):
     return df
 
 # Parameters
-n_lags = 3
+n_lags = 60
 # Multiple targets
-targets = [f'xmeas_{i}' for i in range(12, 20+1)] # ['xmeas_17','xmeas_18']
+targets = [f'xmeas_{i}' for i in range(1, 20+1)] # ['xmeas_17','xmeas_18']
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())

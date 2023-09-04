@@ -1,4 +1,4 @@
-# Experimental setup
+# Experimental setup: including certain targets as predictors
 
 
 import numpy as np

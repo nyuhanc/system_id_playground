@@ -1,3 +1,5 @@
+# Description: XGBoost model for 1 variable
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,7 +22,7 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 3
-targets = ['xmeas_38'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -103,6 +105,10 @@ for target in targets:
 
     # Train XGBoost model
     model.fit(X_train, y_train)
+
+    # # Score the model
+    # score = model.score(X_test, y_test)
+    # print(score)
 
     # Recursive forecasting
     predictions = []
