@@ -60,7 +60,6 @@ for target in targets:
     y_test = test_df[target]
 
     # Create XGBoost model
-    # Create XGBoost model
     model = xgb.XGBRegressor(
         n_estimators=300,
         learning_rate=0.2,
