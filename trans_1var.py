@@ -8,9 +8,12 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
 # Import Keras (transformer model and layers)
+import tensorflow as tf
 from tensorflow import keras
 from keras import layers
-from keras.layers.experimental import preprocessing
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout, LayerNormalization, MultiHeadAttention, Add
+from keras_nlp.layers import SinePositionEncoding
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -52,6 +55,48 @@ df_train = df_train.copy()
 train_size = int(0.8 * len(df))
 train_df, test_df = df[:train_size], df[train_size:]
 
+# --------- Define transformer model constructor -------------
+def create_transformer_model(input_shape, num_heads, feed_forward_dim, dropout_rate=0.1, num_transformer_blocks=2):
+    # :param input_shape: Shape of the input data (number of timesteps, number of features)
+    # :param num_heads: Number of attention heads
+    # :param feed_forward_dim: Hidden layer size in feed forward network inside transformer
+    # :param dropout_rate: Dropout rate
+    # :param num_transformer_blocks: Number of transformer blocks
+
+    # Create the input layer
+    inputs = Input(shape=input_shape)
+
+    # Get positional encoding
+    pos_encoding = SinePositionEncoding(input_shape[0])(inputs)
+
+    # Combine the inputs with the positional encoding
+    x = layers.Add()([inputs, pos_encoding])
+
+    # Transformer blocks
+    for _ in range(num_transformer_blocks):
+        # Multi-head self-attention
+        attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=input_shape[1])(x, x)
+        attn_output = Dropout(dropout_rate)(attn_output)
+        out1 = LayerNormalization(epsilon=1e-6)(x + attn_output)
+
+        # Feed-forward neural network
+        ffn_output = Dense(feed_forward_dim, activation='relu')(out1)
+        ffn_output = Dense(input_shape[1])(ffn_output)
+        ffn_output = Dropout(dropout_rate)(ffn_output)
+
+        # Add and normalize
+        x = LayerNormalization(epsilon=1e-6)(out1 + ffn_output)
+
+    # Output layer for regression
+    # Average the outputs of all transformer blocks (can prevent overfitting, or the
+    # result to be too dependent on just a few values of the output tensor)
+    global_avg_pool = layers.GlobalAveragePooling1D()(x)
+    outputs = Dense(1)(global_avg_pool)
+
+    return Model(inputs=[inputs, pos_encoding], outputs=outputs)
+
+# -----------------------------------------------------------
+
 for target in targets:
 
     # Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
@@ -65,10 +110,20 @@ for target in targets:
     y_test = test_df[target]
 
     # Create transformer model
-    inputs = keras.Input(shape=(len(predictors),))
-    x = layers.Dense(64, activation="relu")(inputs)
-    x = layers.Dense(64, activation="relu")(x)
-    outputs = layers.Dense(1)(x)
-    model = keras.Model(inputs=inputs, outputs=outputs, name="1var_transformer")
+    input_shape = (X_train.shape[1], 1)  # (number of time steps, number of features)
+
+    # Hyperparameters for the transformer model
+    num_heads = 2
+    feed_forward_dim = 128
+
+    # Create the model
+    model = create_transformer_model(input_shape, num_heads, feed_forward_dim)
+
+    # Compile the model
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    model.summary()
+
+
+
 
 
