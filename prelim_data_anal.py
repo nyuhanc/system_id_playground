@@ -42,9 +42,6 @@ max_n_lags = 100 # max number of lags to consider
 targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 xmv_variables = [f'xmv_{i}' for i in range(1, 11+1)]
 
-
-
-
 # For each xmeas, compute cross correlation with each xmv for each lag
 for target in targets:
 

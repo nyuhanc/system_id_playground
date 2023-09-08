@@ -31,7 +31,7 @@ for target in targets:
         df_train[f"{target}_lag{lag}"] = df_train[target].shift(lag)
 
 # Generate lagged features for all xmv_j
-xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
+xmv_variables = [col for col in df_train.columns if 'xmv' in col]
 
 for var in xmv_variables:
     for lag in range(1, n_lags + 1):
