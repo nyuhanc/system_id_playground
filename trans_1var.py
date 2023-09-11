@@ -30,7 +30,7 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 3
-targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -51,9 +51,9 @@ df = df_train.dropna()
 # Defragment the dataframe
 df_train = df_train.copy()
 
-# Train-test split (80/20)
+# Train-test split (80/20) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 train_size = int(0.8 * len(df))
-train_df, test_df = df[:train_size], df[train_size:]
+train_df, test_df = df, df[train_size:] #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # --------- Define transformer model constructor -------------
 def create_transformer_model(input_shape, num_heads, feed_forward_dim, dropout_rate=0.1, num_transformer_blocks=2):
@@ -122,6 +122,40 @@ for target in targets:
     # Compile the model
     model.compile(optimizer='adam', loss='mean_squared_error')
     model.summary()
+
+    # Fit the model
+    history = model.fit(
+        x=[X_train.values[..., np.newaxis], X_train.values[..., np.newaxis]], #
+        y=y_train.values,
+        validation_split=0.2,
+        batch_size=32,
+        epochs=100,
+        callbacks=[
+            keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, mode='min')
+        ]
+    )
+
+    # Evaluate the model
+    y_pred = model.predict([X_test.values[..., np.newaxis], X_test.values[..., np.newaxis]])
+    y_pred = y_pred.reshape(-1)
+    y_test = y_test.values
+
+    # Calculate RMSE
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    print(f'RMSE for {target}: {rmse:.4f}')
+
+    # Plot loss
+    plt.plot(history.history['loss'], label='train')
+    plt.plot(history.history['val_loss'], label='validation')
+    plt.title(f'Loss for {target}')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend()
+    plt.show()
+
+    # Save the model
+    model.save(f'models/transformer_{target}.keras')
+
 
 
 
