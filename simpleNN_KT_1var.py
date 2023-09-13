@@ -1,23 +1,14 @@
-# Keras NN for 1 variable
+# Keras NN for 1 variable, using Keras Tuner to tune hyperparameters
 
-# import numpy as np
-# import pandas as pd
-# import matplotlib.pyplot as plt
-#
-# import xgboost as xgb
-# from sklearn.metrics import mean_squared_error
-#
-# # Import Keras (transformer model and layers)
-# import tensorflow as tf
-# from tensorflow import keras
-# from keras import layers
-# from keras.models import Model
-# from keras.layers import Input, Dense, Dropout, LayerNormalization, Add
-
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
 import tensorflow as tf
-print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
-
-raise ValueError('Stop here')
+from tensorflow import keras
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout
+from kerastuner.tuners import RandomSearch, Hyperband
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -34,7 +25,7 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 10
-targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 21+1)]
+targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 21+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -59,22 +50,24 @@ df_train = df_train.copy()
 train_size = int(0.8 * len(df))
 train_df, test_df = df[:train_size], df[train_size:]
 
-# --------- Simple NN constructor -------------
+# ---- Modified NN constructor to accept hyperparameters ------
+def create_simple_NN(hp):
+    inputs = Input(shape=(n_lags,))
 
-def create_simple_NN(input_shape, num_hidden_layers, hidden_layer_size, dropout_rate=0.1):
+    # Tuning the number of hidden layers and their units
+    for i in range(hp.Int('num_hidden_layers', 1, 5)):
+        x = Dense(hp.Int(f'hidden_units_{i}', 32, 256, step=32), activation='relu')(inputs if i == 0 else x)
+        x = Dropout(hp.Float('dropout_rate', 0.0, 0.5, step=0.1))(x)
 
-    # Create the input layer
-    inputs = Input(shape=input_shape)
-
-    # Hidden layers
-    for _ in range(num_hidden_layers):
-        x = Dense(hidden_layer_size, activation='relu')(inputs)
-        x = Dropout(dropout_rate)(x)
-
-    # Output layer for regression
     outputs = Dense(1)(x)
 
-    return Model(inputs=inputs, outputs=outputs)
+    # Tuning the learning rate
+    optimizer = keras.optimizers.Adam(learning_rate=hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4]))
+
+    model = Model(inputs=inputs, outputs=outputs)
+    model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
+
+    return model
 
 # -----------------------------------------------------------
 
@@ -90,30 +83,29 @@ for target in targets:
     X_test = test_df[predictors]
     y_test = test_df[target]
 
-    # Hyperparameters for the model
-    input_shape = (X_train.shape[1])  # Number of predictors
-    num_hidden_layers = 4
-    hidden_layer_size = 128
-    dropout_rate = 0.1
 
-    # Create the model
-    model = create_simple_NN(input_shape, num_hidden_layers, hidden_layer_size, dropout_rate)
+    input_shape = (X_train.shape[1],)
 
-    # Compile the model
-    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
-
-    # Train the model
-    history = model.fit(
-        X_train, y_train,
-        validation_split=0.2,
-        batch_size=32,
-        epochs=100,
-        verbose=1,
-        shuffle=False,
-        callbacks=[
-            keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')
-        ]
+    # Initialize the tuner and perform hypertuning
+    tuner = Hyperband(
+        create_simple_NN,
+        objective='val_loss',
+        max_epochs=40,  # Maximum number of epochs to train one model
+        factor=3,  # Reduction factor for the number of epochs and number of models for each bracket
+        directory='keras_tuner_dir',
+        project_name=f'keras_tuner_{target}',
+        overwrite=True  # Useful to overwrite previous results if re-running
     )
+
+    tuner.search(X_train, y_train,
+                 validation_split=0.2,
+                 epochs=100,
+                 batch_size=32,
+                 callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')],
+                 verbose=2)
+
+    # Retrieve the best model and hyperparameters
+    model = tuner.get_best_models(num_models=1)[0]
 
     # # Score the model
     # y_pred = model.predict(X_test)
