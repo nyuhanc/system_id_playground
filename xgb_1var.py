@@ -21,8 +21,8 @@ def normalize_data(df):
     return df
 
 # Parameters
-n_lags = 3
-targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+n_lags = 10
+targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -52,7 +52,7 @@ for target in targets:
     # Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
     predictors = [f"{target}_lag{i}" for i in range(1, n_lags + 1)]
     for var in xmv_variables:
-        predictors.extend([f"{var}_lag{i}" for i in range(1, n_lags + 1)])
+        predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags + 1)])
 
     X_train = train_df[predictors]
     y_train = train_df[target]
@@ -61,7 +61,7 @@ for target in targets:
 
     # Create XGBoost model
     model = xgb.XGBRegressor(
-        n_estimators=300,
+        n_estimators=500,
         learning_rate=0.2,
         objective='reg:squarederror',
         max_depth=8,
@@ -119,8 +119,7 @@ for target in targets:
         # Prepare input data for prediction
         input_data = {f"{target}_lag{j + 1}": xmeas_lags[-(j + 1)] for j in range(n_lags)}
         for var in xmv_variables:
-            input_data[var] = test_df.iloc[i + n_lags][var]
-            for lag in range(1, n_lags + 1):
+            for lag in range(0, n_lags + 1):
                 input_data[f"{var}_lag{lag}"] = test_df.iloc[i + n_lags - lag][var]
         input_df = pd.DataFrame([input_data])
 
@@ -153,7 +152,7 @@ for target in targets:
     ax.text(0.985, 0.02, f'RMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/xgb_1var_{target:02}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(f'plots/xgb_1var_{target}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
     # Show the plot
     plt.show()

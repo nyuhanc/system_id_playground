@@ -51,8 +51,8 @@ train_size = int(0.8 * len(df))
 train_df, test_df = df[:train_size], df[train_size:]
 
 # ---- Modified NN constructor to accept hyperparameters ------
-def create_simple_NN(hp):
-    inputs = Input(shape=(n_lags,))
+def create_simple_NN(hp, input_shape):
+    inputs = Input(shape=input_shape)
 
     # Tuning the number of hidden layers and their units
     for i in range(hp.Int('num_hidden_layers', 1, 5)):
@@ -88,18 +88,18 @@ for target in targets:
 
     # Initialize the tuner and perform hypertuning
     tuner = Hyperband(
-        create_simple_NN,
+        lambda hp: create_simple_NN(hp, input_shape=input_shape),
         objective='val_loss',
-        max_epochs=40,  # Maximum number of epochs to train one model
-        factor=3,  # Reduction factor for the number of epochs and number of models for each bracket
+        max_epochs=40,
+        factor=3,
         directory='keras_tuner_dir',
         project_name=f'keras_tuner_{target}',
-        overwrite=True  # Useful to overwrite previous results if re-running
+        overwrite=True
     )
 
     tuner.search(X_train, y_train,
                  validation_split=0.2,
-                 epochs=100,
+                 epochs=100, # Replaced by max_epochs in Hyperband
                  batch_size=32,
                  callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')],
                  verbose=2)
@@ -158,7 +158,7 @@ for target in targets:
     ax.text(0.985, 0.02, f'RMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/NN_1var_{target:02}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(f'plots/NN_1var_{target}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
     # Show the plot
     plt.show()

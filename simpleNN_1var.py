@@ -1,23 +1,20 @@
 # Keras NN for 1 variable
 
-# import numpy as np
-# import pandas as pd
-# import matplotlib.pyplot as plt
-#
-# import xgboost as xgb
-# from sklearn.metrics import mean_squared_error
-#
-# # Import Keras (transformer model and layers)
-# import tensorflow as tf
-# from tensorflow import keras
-# from keras import layers
-# from keras.models import Model
-# from keras.layers import Input, Dense, Dropout, LayerNormalization, Add
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
+from sklearn.metrics import mean_squared_error
+
+# Import Keras (transformer model and layers)
 import tensorflow as tf
-print(tf.config.experimental.list_physical_devices('GPU')) # 1
+from tensorflow import keras
+from keras import layers
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout, LayerNormalization, Add
 
-raise ValueError('Stop here')
+# Check if GPU is available
+print(tf.config.experimental.list_physical_devices('GPU')) # If empty, GPU is not available
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -33,8 +30,8 @@ def normalize_data(df):
     return df
 
 # Parameters
-n_lags = 10
-targets = ['xmeas_2'] #[f'xmeas_{i}' for i in range(1, 21+1)]
+n_lags = 3
+targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 21+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -166,7 +163,7 @@ for target in targets:
     ax.text(0.985, 0.02, f'RMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/NN_1var_{target:02}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(f'plots/NN_1var_{target}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
     # Show the plot
     plt.show()
