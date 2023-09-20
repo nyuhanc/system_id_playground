@@ -26,13 +26,16 @@ targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
-for target in targets:
-    for lag in range(1, n_lags + 1):
-        df_train[f"{target}_lag{lag}"] = df_train[target].shift(lag)
 
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col]
 
+# Generate lagged features for target (at times t-1, t-2, ..., t-n_lags)
+for target in targets:
+    for lag in range(1, n_lags + 1):
+        df_train[f"{target}_lag{lag}"] = df_train[target].shift(lag)
+
+# Generate lagged features for xmv_j (at times t, t-1, t-2, ..., t-n_lags)
 for var in xmv_variables:
     for lag in range(0, n_lags + 1):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
