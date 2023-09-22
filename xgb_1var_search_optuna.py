@@ -142,7 +142,6 @@ print('  Params: ')
 for key, value in trial.params.items():
     print('    {}: {}'.format(key, value))
 
-
 # Save results to csv, add a unique 3-digit timestamp to the filename
 timestr = time.strftime("%m%d-%H%M")
 results = study.trials_dataframe()
