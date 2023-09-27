@@ -1,4 +1,4 @@
-# Keras Transformer for 1 variable
+# Keras Transformer-Encoder for 1 variable
 
 import numpy as np
 import pandas as pd
@@ -59,7 +59,7 @@ train_df, test_df = df[:train_size], df[train_size:]
 num_features = len(xmv_variables) + 1 # 11 xmv variables + 1 target variable
 
 # --------- Define transformer model constructor -------------
-def create_transformer_model(input_shape, num_heads, feed_forward_dim, dropout_rate=0.1, num_transformer_blocks=2):
+def create_encoder_model(input_shape, num_heads, feed_forward_dim, dropout_rate=0.1, num_transformer_blocks=2):
     # :param input_shape: Shape of the input data (batch_size, number of timesteps, number of features)
     # :param num_heads: Number of attention heads
     # :param feed_forward_dim: Hidden layer size in feed forward network inside transformer
@@ -119,7 +119,7 @@ for target in targets:
     dropout_rate = 0.1
 
     # Create the model
-    model = create_transformer_model(
+    model = create_encoder_model(
         input_shape=input_shape,
         num_heads=num_heads,
         feed_forward_dim=feed_forward_dim,
