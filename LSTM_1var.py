@@ -72,7 +72,7 @@ print(f"Val size: {len(val_df)}")
 print(f"Test size: {len(test_df)}")
 
 # Number of features
-num_features = len(xmv_variables) + 1 # 11 xmv variables + 1 target variable
+num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
 
 # --------- Define LSTM model constructor -------------
 def create_lstm_model(input_shape, lstm_layers=[50, 50], dropout_rate=0.1, stateful=False, batch_size=None):
@@ -138,7 +138,7 @@ for target in targets:
         ]
     )
 
-    # Score the model
+    # Score the model on validation set
     print(f"NRMSE on val. set: "
           f"{NRMSE(model.predict(X_val).reshape(-1), y_val)}")
 
@@ -201,10 +201,3 @@ for target in targets:
 
     # Show the plot
     plt.show()
-
-
-
-
-
-
-
