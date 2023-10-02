@@ -26,8 +26,8 @@ def normalize_data(df):
     return df
 
 # Parameters
-n_lags = 3
-target = 'xmeas_2'
+n_lags = 10
+target = 'xmeas_1'
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -36,9 +36,8 @@ for lag in range(1, n_lags + 1):
 
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
-
 for var in xmv_variables:
-    for lag in range(1, n_lags + 1):
+    for lag in range(0, n_lags + 1):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
 
 # Drop missing values (due to lagged features creation)
@@ -47,18 +46,24 @@ df = df_train.dropna()
 # Defragment the dataframe
 df_train = df_train.copy()
 
-# Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
+# Train-val-test split (80/19/1), but all dividable with 512 (consistency with LSTM)
+train_size = int(0.8 * len(df))
+train_size = train_size - (train_size % 512)
+val_size = int(0.19 * len(df))
+val_size = val_size - (val_size % 512)
+train_val_df = df[:train_size + val_size]
+
+# Number of features
+num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
+
+# Define predictors: - xmvs from time t-n_lags to t (!!!)
+#                    - xmeas from time t-(n_lags+1) to t-1
 predictors = [f"{target}_lag{i}" for i in range(1, n_lags + 1)]
 for var in xmv_variables:
-    predictors.extend([var] + [f"{var}_lag{i}" for i in range(1, n_lags + 1)])
+    predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags)])
 
-X_train = df_train[predictors]
-y_train = df_train[target]
-
-# Use scikit-learn RandomizedSearchCV to tune hyperparameters
-
-# Create XGBoost model
-model = xgb.XGBRegressor()
+X_train_val = train_val_df[predictors].values
+y_train_val = train_val_df[target].values
 
 # Define parameter grid
 param_grid = {
@@ -105,7 +110,7 @@ for key1 in param_grid_best.keys():
 
             # Instantiate the grid search model
             grid_search = GridSearchCV(
-                estimator=model,
+                estimator=xgb.XGBRegressor(),
                 param_grid=param_grid_,
                 scoring='neg_mean_squared_error',
                 n_jobs=-2,
@@ -114,7 +119,7 @@ for key1 in param_grid_best.keys():
             )
 
             # Fit the grid search to the data
-            grid_search.fit(X_train, y_train)
+            grid_search.fit(X_train_val, y_train_val)
 
             # Print name of the hyperparameters being varied
             print(f'Hyperparameters being varied: {key1}, {key2}')

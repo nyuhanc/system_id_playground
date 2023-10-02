@@ -9,7 +9,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
 # Load data
-df_train_OG = pd.read_csv('data/faultfreetraining.txt')
+df_train_OG = pd.read_csv('../data/faultfreetraining.txt')
 #df_test_OG = pd.read_csv('data/faultfreetesting.txt')
 
 # Normalize data

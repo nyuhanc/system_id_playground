@@ -8,7 +8,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
 # Load data
-df_train_OG = pd.read_csv('data/faultfreetraining.txt')
+df_train_OG = pd.read_csv('../data/faultfreetraining.txt')
 #df_test_OG = pd.read_csv('data/faultfreetesting.txt')
 
 # Normalize data
@@ -23,7 +23,7 @@ def normalize_data(df):
 # Parameters
 target = 'xmeas_2'
 # Load laggs
-lags_xmv = np.load('data/hci_xmeas_2.npy')
+lags_xmv = np.load('../data/hci_xmeas_2.npy')
 lags_target = np.asarray([1, 6, 7, 2])
 
 # Generate lagged features for target

@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
+#df_test_OG = pd.read_csv('data/faultfreetesting.txt')
 
 # Normalize data
 def normalize_data(df):
@@ -34,7 +35,7 @@ n_lags = 10
 target = 'xmeas_1'
 
 # Search Parameters
-par_n_trials = 1000
+par_n_trials = 1000  # number of trials
 par_min_resource = 100  # minimum number of boosting rounds (n_estimators)
 par_max_resource = 500  # maximum number of boosting rounds (n_estimators)
 
@@ -44,15 +45,13 @@ def budget_func(x):
     return int(par_min_resource * (par_max_resource / par_min_resource)
                ** ((x + 1) / par_n_trials) ** ((5*par_n_trials)/(x+par_n_trials)))
 
-
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
 for lag in range(1, n_lags + 1):
     df_train[f"{target}_lag{lag}"] = df_train[target].shift(lag)
 
 # Generate lagged features for all xmv_j
-xmv_variables = [col for col in df_train.columns if 'xmv' in col]  # xmvs 1-11
-
+xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
 for var in xmv_variables:
     for lag in range(0, n_lags + 1):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
@@ -63,16 +62,32 @@ df = df_train.dropna()
 # Defragment the dataframe
 df_train = df_train.copy()
 
-# Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
+# Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
+train_size = int(0.8 * len(df))
+train_size = train_size - (train_size % 512)
+train_df = df[:train_size]
+
+val_size = int(0.19 * len(df))
+val_size = val_size - (val_size % 512)
+val_df = df[train_size:train_size + val_size]
+
+print(f"Train size: {len(train_df)}")
+print(f"Val size: {len(val_df)}")
+print(f"Number of trials: {par_n_trials}")
+
+# Number of features
+num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
+
+# Define predictors: - xmvs from time t-n_lags to t (!!!)
+#                    - xmeas from time t-(n_lags+1) to t-1
 predictors = [f"{target}_lag{i}" for i in range(1, n_lags + 1)]
 for var in xmv_variables:
-    predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags + 1)])
+    predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags)])
 
-X_train = df_train[predictors]
-y_train = df_train[target]
-
-# Split data for validation
-X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+X_train = train_df[predictors].values
+y_train = train_df[target].values
+X_val = val_df[predictors].values
+y_val = val_df[target].values
 
 def objective(trial):
     # Get the current resource budget for this trial

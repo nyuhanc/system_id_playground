@@ -49,7 +49,7 @@ print(df[['params', 'mean_test_score']].head(10))
 # --- ANALYSIS OF THE RESULTS OF THE GRID SEARCH CROSS VALIDATION -------
 # --- (DEPENDENCE OF LOSS ON TWO HYPERS. WHILE OTHERS BEING FIXED) ------
 
-# For the time being in xgb_1var_search_SGCV_2by2.py
+# For the time being in xgb_1var_SGCV_2by2.py
 
 
 

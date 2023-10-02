@@ -4,15 +4,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import xgboost as xgb
-from sklearn.metrics import mean_squared_error
-
-# Import Keras (transformer model and layers)
 import tensorflow as tf
 from tensorflow import keras
-from keras import layers
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout, LayerNormalization, LSTM, Add
+from keras.layers import Input, Dense, Dropout, LSTM
+from sklearn.metrics import mean_squared_error
+
+# Check if GPU is available
+print(tf.config.experimental.list_physical_devices('GPU')) # If empty, GPU is not available
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -29,7 +28,7 @@ def normalize_data(df):
 
 # Normalized Root Mean Squared Error (with STD)
 def NRMSE(y_true, y_pred):
-    return np.sqrt(np.mean((y_true - y_pred)**2)) / np.std(y_true)
+    return np.sqrt(mean_squared_error(y_true,y_pred)) / np.std(y_true)
 
 # Parameters
 n_lags = 10
@@ -43,7 +42,6 @@ for target in targets:
 
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
-
 for var in xmv_variables:
     for lag in range(0, n_lags):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
@@ -76,8 +74,8 @@ num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
 
 # --------- Define LSTM model constructor -------------
 def create_lstm_model(input_shape, lstm_layers=[50, 50], dropout_rate=0.1, stateful=False, batch_size=None):
-    inputs = Input(batch_shape=(batch_size, input_shape[0], input_shape[1]) if stateful else (
-    None, input_shape[0], input_shape[1]))
+
+    inputs = Input(batch_shape=(batch_size, input_shape[0], input_shape[1]))
 
     x = inputs  # (batch_size, seq_len, num_features)
     for i, units in enumerate(lstm_layers):
@@ -94,11 +92,13 @@ def create_lstm_model(input_shape, lstm_layers=[50, 50], dropout_rate=0.1, state
 
 for target in targets:
 
-    # Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
+    # Define predictors: - xmvs from time t-n_lags to t (!!!)
+    #                    - xmeas from time t-(n_lags+1) to t-1
     predictors = [f"{target}_lag{i}" for i in range(1, n_lags + 1)]
     for var in xmv_variables:
         predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags)])
 
+    # Reshape data to fit LSTM model (samples, timesteps, features)
     X_train = train_df[predictors].values.reshape(-1, n_lags, num_features)
     y_train = train_df[target].values
     X_val = val_df[predictors].values.reshape(-1, n_lags, num_features)
@@ -107,10 +107,10 @@ for target in targets:
     y_test = test_df[target].values
 
     # Hyperparameters for the model
-    input_shape = (X_train.shape[1], X_train.shape[2])
-    lstm_layers = [50, 50, 50]  # Three LSTM layers with 50 units each
-    dropout_rate = 0.05
-    stateful = True  # stateful LSTM !!!!!
+    input_shape = (X_train.shape[1], X_train.shape[2])  # (n_lags, features)
+    lstm_layers = [96, 96, 64]
+    dropout_rate = 0
+    stateful = False  # stateful LSTM !!!!!
     batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
 
     # Create the LSTM model
@@ -137,6 +137,9 @@ for target in targets:
             keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, mode='min')
         ]
     )
+
+    # Save model
+    model.save(f'models/LSTM_1var_{target}_n_lags_{n_lags}.h5')
 
     # Score the model on validation set
     print(f"NRMSE on val. set: "
@@ -174,7 +177,6 @@ for target in targets:
 
     # Calculate NRMSE  ( [:predict_n_steps] because if predict_n_steps < len(y_test) )
     nrmse_value = NRMSE(y_test[:predict_n_steps], predictions)
-    rmse_value = mean_squared_error(y_test[:predict_n_steps], predictions, squared=False)
 
     # Plot predictions vs. actuals
     plot_samples = 150
@@ -183,20 +185,21 @@ for target in targets:
 
     # Create a figure and axis object
     fig, ax = plt.subplots()
-    fig.suptitle(f'n_lags={n_lags}(+1), traget={target}, RMSE={rmse_value:.4f}')
+    fig.suptitle(f'LSTM: n={n_lags}, tar={target}')
 
     # Plot actual and predicted values
     ax.plot(np.arange(len(predicted_values)), actual_values, label='Actual')
     ax.plot(np.arange(len(predicted_values)), predicted_values, label='Predicted')
 
-    # Add grid, legend, and RMSE text
+    # Add grid, legend, and NRMSE text
     ax.grid(True)
     ax.legend(loc=1)
-    ax.text(0.985, 0.02, f'NRMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
+    ax.text(0.985, 0.02, f'NRMSE: {nrmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
             color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/LSTM_1var_{target}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight',
+    st = 'stateful' if stateful else 'stateless'
+    plt.savefig(f'plots/LSTM{st}_1var_{target}_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight',
                 pad_inches=0.1)
 
     # Show the plot
