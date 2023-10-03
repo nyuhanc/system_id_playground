@@ -1,15 +1,15 @@
 # Hyperparameter tuning using scikit-learn GridSearchCV (varying two hypers at others fixed at optimal values
-# found by RandomizedSearchCV)
+# found by HalvingRandomSearchCV)
+# This is a secondary analysis, i.e. we are not looking for the best hyperparameters, but rather
+# we are looking for the dependence of the loss on two hyperparameters while keeping the others
+# fixed at their optimal values found by HalvingRandomSearchCV.
 
 import time
-
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 import xgboost as xgb
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
 
 # Load data
@@ -47,6 +47,7 @@ df = df_train.dropna()
 df_train = df_train.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (consistency with LSTM)
+# We use train+val set for CV
 train_size = int(0.8 * len(df))
 train_size = train_size - (train_size % 512)
 val_size = int(0.19 * len(df))
@@ -74,7 +75,7 @@ param_grid = {
     'colsample_bytree': [0.5, 0.7, 0.9], # [0.5, 0.7, 0.9]
 }
 
-# Best (or chosen) set of parameters from the preliminary analysis
+# Chosen (or promising) set of parameters (from HRSCV)
 param_grid_best = {
     'sub': [1],
     'n_estimators': [100],
@@ -114,8 +115,8 @@ for key1 in param_grid_best.keys():
                 param_grid=param_grid_,
                 scoring='neg_mean_squared_error',
                 n_jobs=-2,
-                cv=5,
-                verbose=3,
+                cv=4,
+                verbose=2,
             )
 
             # Fit the grid search to the data

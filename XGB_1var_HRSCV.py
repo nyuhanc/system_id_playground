@@ -1,16 +1,10 @@
-# Hyperparameter tuning using scikit-learn RandomizedSearchCV
+# Hyperparameter tuning using scikit-learn HalvingRandomSearchCV for a single target
 
 import time
-
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
 import xgboost as xgb
-from sklearn.metrics import mean_squared_error
 from sklearn.experimental import enable_halving_search_cv
-from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV
-
+from sklearn.model_selection import HalvingRandomSearchCV
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -47,14 +41,12 @@ df = df_train.dropna()
 df_train = df_train.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (consistency with LSTM)
+# We use train+val set for CV
 train_size = int(0.8 * len(df))
 train_size = train_size - (train_size % 512)
 val_size = int(0.19 * len(df))
 val_size = val_size - (val_size % 512)
 train_val_df = df[:train_size + val_size]
-
-# Number of features
-num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
 
 # Define predictors: - xmvs from time t-n_lags to t (!!!)
 #                    - xmeas from time t-(n_lags+1) to t-1
@@ -67,36 +59,36 @@ y_train_val = train_val_df[target].values
 
 # Define parameter grid
 param_grid = {
-    #'n_estimators': [100, 150, 200, 250, 300],  # [100, 150, 200, 250, 300]
-    'max_depth': [1, 2, 3, 4, 5, 6, 7, 8],  # [1, 2, 3, 4, 5, 6, 7, 8]
-    'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2],  # [0.01, 0.05, 0.1, 0.15, 0.2]
-    #'sub': [0.5, 0.75, 1],  # [0.5, 0.75, 1] subsample
-    'colsample_bytree': [0.5, 0.7, 0.9],  # [0.5, 0.7, 0.9]
+    # 'n_estimators' is the boosting rounds, which is the resource metric (*)
+    'max_depth': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2],
+    #'subsample': [0.5, 0.75, 1],
+    'colsample_bytree': [0.9, 0.95, 1.0],
+    'reg_lambda': [1e-3, 1e-2, 1e-1],  # L2
+    'reg_alpha': [1e-3, 1e-2, 1e-1],  # L1
+    #'booster': ['gbtree', 'gblinear', 'dart'],
+    'min_child_weight': [1, 3, 5, 7, 9],
+    'gamma': [0.0, 0.1, 0.2],  # Minimum loss reduction required to make a further partition on a leaf node
 }
 
-# # Instantiate the random search model
-# search = RandomizedSearchCV(
-#     estimator=xgb.XGBRegressor(),
-#     param_distributions=param_grid,
-#     n_iter=1000,  # Number of candidates/iterations
-#     scoring='neg_mean_squared_error',
-#     n_jobs=-2,
-#     cv=5,  # 5 fold split
-#     verbose=3,
-# )
+min_resources = 100  # Minimum number of boosting rounds
+max_resources = 500  # Maximum number of boosting rounds
+# Number of resources is multiplied by factor after each iteration. The exponent of
+# 1/n means that the algorithm will increase the number of boosting rounds n+1 times
+factor = (max_resources/min_resources) ** (1/4)  # 5 iterations for (1/4) exponent
 
 # Instantiate the halving random search model
 search = HalvingRandomSearchCV(
     estimator=xgb.XGBRegressor(),
     param_distributions=param_grid,
-    resource='n_estimators',  # Use boosting rounds as resource metric
-    min_resources=100,  # Minimum number of boosting rounds
-    max_resources=500,  # Maximum number of boosting rounds
-    factor=2,  # Halving factor
-    n_candidates=100,  # Number of candidates in the first iteration
+    resource='n_estimators',  # Use boosting rounds as resource metric (*)
+    min_resources=min_resources,
+    max_resources=max_resources+1,
+    factor=factor,
+    n_candidates=100,  # Number of candidates in the first iteration (then ~ this/factor in each iteration)
     scoring='neg_mean_squared_error',
     n_jobs=-2,  # Use all but one CPU core
-    cv=5,  # 5 fold split CV
+    cv=4,  # 4-fold split CV
     verbose=2,
 )
 
@@ -117,7 +109,7 @@ print('with score: ', search.best_score_)
 # Save results to csv, add a unique 3-digit timestamp to the filename
 timestr = time.strftime("%m%d-%H%M")
 results = pd.DataFrame(search.cv_results_)
-results.to_csv(f'results/xgb_HRSCVres_({timestr})_{target}.csv', index=False)
+results.to_csv(f'results/xgb_1var_HRSCVres_({timestr})_{target}.csv', index=False)
 
 
 

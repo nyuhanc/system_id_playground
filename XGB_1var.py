@@ -37,7 +37,7 @@ for target in targets:
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
 for var in xmv_variables:
-    for lag in range(0, n_lags + 1):
+    for lag in range(0, n_lags):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
 
 # Drop missing values (due to lagged features creation)
@@ -63,9 +63,6 @@ print(f"Train size: {len(train_df)}")
 print(f"Val size: {len(val_df)}")
 print(f"Test size: {len(test_df)}")
 
-# Number of features
-num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
-
 for target in targets:
 
     # Define predictors: - xmvs from time t-n_lags to t (!!!)
@@ -84,18 +81,18 @@ for target in targets:
     # Create XGBoost model
     model = xgb.XGBRegressor(
         objective='reg:squarederror',
-        n_estimators=500,
+        n_estimators=400,
         booster='gbtree',
-        learning_rate=0.02209773543450828,
-        subsample=0.909873641768568,
-        colsample_bytree=0.9910192337571956,
-        reg_lambda=0.7530702981035536,
-        reg_alpha=0.017560230153432665,
-        max_depth=10,
-        min_child_weight=9,
-        eta=3.6835373674756498e-06,
-        gamma=4.222259824436734e-06,
-        grow_policy='lossguide',
+        learning_rate=0.05,
+        subsample=1,
+        colsample_bytree=1,
+        # reg_lambda=0.7530702981035536,
+        # reg_alpha=0.017560230153432665,
+        max_depth=8,
+        # min_child_weight=9,
+        # eta=3.6835373674756498e-06,
+        # gamma=4.222259824436734e-06,
+        # grow_policy='lossguide',
         verbosity=3,
         device='cpu',  # gpu often runs out of memory
     )
@@ -104,23 +101,26 @@ for target in targets:
     model.fit(X_train, y_train)
 
     # Save model
-    model.save_model(f'models/xgb_1var_{target}_n_lags_{n_lags}.json')
+    model.save_model(f'models/XGB_1var_{target}_n_lags_{n_lags}.json')
 
     # Score the model on validation set
     print(f"NRMSE on val. set: "
-          f"{NRMSE(model.predict(X_val).reshape(-1), y_val)}")
+          f"{NRMSE(model.predict(X_val), y_val)}")
 
     # Recursive forecasting
     predictions = []
     xmeas_lags = test_df[[f"{target}_lag{i}" for i in range(1, n_lags + 1)]].iloc[0].tolist()[::-1]
     predict_n_steps = len(y_test)
 
-    for i in range(predict_n_steps): # len(y_test) - n_lags):
+    for i in range(predict_n_steps):
         # Prepare input data for prediction
-        input_data = {f"{target}_lag{j + 1}": xmeas_lags[-(j + 1)] for j in range(n_lags)}
-        for var in xmv_variables:
+        input_data = {}
+        for var in [target] + xmv_variables:
             for lag in range(0, n_lags):
-                input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
+                if var == target:
+                    input_data[f"{var}_lag{lag + 1}"] = xmeas_lags[-(lag + 1)]
+                else:
+                    input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
         input_df = pd.DataFrame([input_data])
 
         # Make a prediction

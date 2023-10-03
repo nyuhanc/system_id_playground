@@ -20,10 +20,27 @@ def normalize_data(df):
             df[col] = (df[col] - df[col].mean()) / df[col].std()
     return df
 
+# Normalized Root Mean Squared Error (with STD)
+def NRMSE(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true,y_pred)) / np.std(y_true)
+
 # Parameters
-n_lags = 60
-# Multiple targets
-targets = [f'xmeas_{i}' for i in range(1, 20+1)] # ['xmeas_17','xmeas_18']
+n_lags = 10
+# Including targets with relatively good 1var fit
+targets = [
+    'xmeas_1',   # Very good 1var fit
+    'xmeas_7',  # Not that good 1var fit
+    'xmeas_10',  # Very good 1var fit
+    'xmeas_12',  # Very good 1var fit
+    'xmeas_13',  # Not that good 1var fit
+    'xmeas_15',  # Very good 1var fit
+    'xmeas_17',  # Very good 1var fit
+    'xmeas_16',  # Not that good 1var fit
+    'xmeas_18',  # Not that good 1var fit
+    'xmeas_19',  # Not that good 1var fit
+    'xmeas_20',  # Not that good 1var fit
+    'xmeas_21',  # Not that good 1var fit
+]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -33,9 +50,8 @@ for target in targets:
 
 # Generate lagged features for all xmv_j
 xmv_variables = [col for col in df_train.columns if 'xmv' in col] # xmvs 1-11
-
 for var in xmv_variables:
-    for lag in range(1, n_lags + 1):
+    for lag in range(0, n_lags):
         df_train[f"{var}_lag{lag}"] = df_train[var].shift(lag)
 
 # Drop missing values (due to lagged features creation)
@@ -44,84 +60,65 @@ df = df_train.dropna()
 # Defragment the dataframe
 df_train = df_train.copy()
 
-# Train-test split (80/20)
+# Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
-train_df, test_df = df[:train_size], df[train_size:]
+train_size = train_size - (train_size % 512)
+train_df = df[:train_size]
 
+val_size = int(0.19 * len(df))
+val_size = val_size - (val_size % 512)
+val_df = df[train_size:train_size + val_size]
+
+test_size = len(df) - train_size - val_size
+test_size = test_size - (test_size % 512)
+test_df = df[train_size + val_size:train_size + val_size + test_size]
+
+print(f"Train size: {len(train_df)}")
+print(f"Val size: {len(val_df)}")
+print(f"Test size: {len(test_df)}")
 
 # Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
 predictors = []
 for target in targets:
     predictors.extend([f"{target}_lag{i}" for i in range(1, n_lags + 1)])
 for var in xmv_variables:
-    predictors.extend([var] + [f"{var}_lag{i}" for i in range(1, n_lags + 1)])
+    predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags)])
 
-X_train = train_df[predictors]
-y_train = train_df[targets]
-X_test = test_df[predictors]
-y_test = test_df[targets]
+X_train = train_df[predictors].values
+y_train = train_df[targets].values
+X_val = val_df[predictors].values
+y_val = val_df[targets].values
+X_test = test_df[predictors].values
+y_test = test_df[targets].values
 
 # Create XGBoost model
-model = xgb.XGBRegressor(
-    # n_estimators=300,
-    # learning_rate=0.2,
-    # objective='reg:squarederror',
-    # max_depth=8,
-    # max_leaves=None,
-    # max_bin=None,
-    # grow_policy=None,
-    # verbosity=3,
-    # booster=None,
-    # tree_method=None,
-    # gamma=None,
-    # min_child_weight=None,
-    # max_delta_step=None,
-    # subsample=None,
-    # sampling_method=None,
-    # colsample_bytree=0.9,
-    # colsample_bylevel=None,
-    # colsample_bynode=None,
-    # reg_alpha=None,
-    # reg_lambda=None,
-    # scale_pos_weight=None,
-    # base_score=None,
-    # num_parallel_tree=None,
-    # random_state=None,
-    # n_jobs=None,
-    # monotone_constraints=None,
-    # interaction_constraints=None,
-    # importance_type=None,
-    # gpu_id=None,
-    # validate_parameters=None,
-    # predictor=None,
-    # enable_categorical=False,
-    # feature_types=None,
-    # max_cat_to_onehot=None,
-    # max_cat_threshold=None,
-    # eval_metric=None,
-    # early_stopping_rounds=None,
-    # callbacks=None,
-)
+model = xgb.XGBRegressor()
 
 # Train XGBoost model
 model.fit(X_train, y_train)
 
+# Save model
+model.save_model(f'models/XGB_mvar_n_lags_{n_lags}.json')
+
+# Score the model on validation set
+print(f"NRMSE on val. set: "
+      f"{NRMSE(model.predict(X_val), y_val)}")
+
 # Recursive forecasting
 predictions = []
-xmeas_lags = {target: y_test[target].iloc[:n_lags].tolist() for target in targets}
-
-predict_n_steps = 100
+xmeas_lags = {target: test_df[[f"{target}_lag{i}" for i in range(1, n_lags + 1)]].iloc[0].tolist()[::-1]
+              for target in targets}
+predict_n_steps = len(y_test)
 
 for i in range(predict_n_steps):
     # Prepare input data for prediction
     input_data = {}
-    for target in targets:
-        input_data.update({f"{target}_lag{j + 1}": xmeas_lags[target][-(j + 1)] for j in range(n_lags)})
-    for var in xmv_variables:
-        input_data[var] = test_df.iloc[i + n_lags][var]
-        for lag in range(1, n_lags + 1):
-            input_data[f"{var}_lag{lag}"] = test_df.iloc[i + n_lags - lag][var]
-
+    for var in targets + xmv_variables:
+        for lag in range(0, n_lags):
+            if var in targets:
+                input_data[f"{var}_lag{lag + 1}"] = xmeas_lags[var][-(lag + 1)]
+            else:
+                input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
     input_df = pd.DataFrame([input_data])
 
     # Make a prediction
@@ -132,8 +129,8 @@ for i in range(predict_n_steps):
     for idx, target in enumerate(targets):
         xmeas_lags[target].append(prediction[idx])
 
-# Initialize a dictionary to hold RMSE for each target
-rmse_values = {}
+# Initialize a dictionary to hold NRMSE for each target
+nrmse_values = {}
 
 # Initialize a dictionary to hold predictions for each target
 predictions_dict = {target: [] for target in targets}
@@ -143,22 +140,20 @@ for prediction in predictions:
     for idx, target in enumerate(targets):
         predictions_dict[target].append(prediction[idx])
 
-# Calculate and print RMSE for each target
+# Calculate and print NRMSE for each target
 for target in targets:
-    rmse_value = mean_squared_error(
-        y_test[target].iloc[n_lags:n_lags + predict_n_steps],
+    nrmse_value = NRMSE(
+        test_df[target][:predict_n_steps],
         predictions_dict[target],
-        squared=False
     )
-    rmse_values[target] = rmse_value
-    print(f'RMSE for {target}: {rmse_value:.4f}')
-
+    nrmse_values[target] = nrmse_value
+    print(f'NRMSE for {target}: {nrmse_value:.4f}')
 
 # Plotting
 # Determine the number of rows needed
 n_rows = int(np.ceil(len(targets) / 3.0))
 fig, axes = plt.subplots(n_rows, 3, figsize=(15, 5 * n_rows), sharex=True)
-fig.suptitle(f'n_lags={n_lags}(+1), multiple targets')
+fig.suptitle(f'n_lags={n_lags}, multitarget')
 
 # Flatten the axes to make indexing easier
 axes = axes.flatten()
@@ -167,12 +162,13 @@ axes = axes.flatten()
 for i in range(len(targets), n_rows * 3):
     axes[i].axis('off')
 
+plot_samples = 150
 for idx, target in enumerate(targets):
     ax = axes[idx]
 
     # Plot actual and predicted values
-    actual_values = y_test[target][n_lags:n_lags + predict_n_steps]
-    predicted_values = predictions_dict[target][:predict_n_steps]
+    actual_values = test_df[target][:plot_samples]
+    predicted_values = predictions_dict[target][:plot_samples]
 
     ax.plot(np.arange(len(predicted_values)), actual_values, label='Actual')
     ax.plot(np.arange(len(predicted_values)), predicted_values, label='Predicted')
@@ -181,14 +177,14 @@ for idx, target in enumerate(targets):
     # Add grid, legend, and RMSE text
     ax.grid(True)
     ax.legend(loc=1)
-    ax.text(0.985, 0.02, f'RMSE: {rmse_values[target]:.4f}',
+    ax.text(0.985, 0.02, f'RMSE: {nrmse_values[target]:.4f}',
             transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
             color='black',
             bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
 
 # Save the plot
-plt.savefig(f'plots/xgb_multivar_{str(targets).replace(" ", "")}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+plt.savefig(f'plots/XGB_mvar_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
 # Show the plot
 plt.show()

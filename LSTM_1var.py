@@ -151,11 +151,15 @@ for target in targets:
     predict_n_steps = len(y_test)
 
     for i in range(predict_n_steps):
+
         # Prepare input data for prediction
-        input_data = {f"{target}_lag{j + 1}": xmeas_lags[-(j + 1)] for j in range(n_lags)}
-        for var in xmv_variables:
+        input_data = {}
+        for var in [target] + xmv_variables:
             for lag in range(0, n_lags):
-                input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
+                if var == target:
+                    input_data[f"{var}_lag{lag + 1}"] = xmeas_lags[-(lag + 1)]
+                else:
+                    input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
         input_df = pd.DataFrame([input_data])
         input_tensor = input_df.to_numpy(dtype='float32').reshape(n_lags, num_features)
 
