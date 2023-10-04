@@ -96,7 +96,7 @@ search = HalvingRandomSearchCV(
 search.fit(X_train_val, y_train_val)
 
 # Print best parameters
-print('Best parameters: ')
+print(f"Best hyperparameters for {target}:")
 print(search.best_params_)
 print('\n')
 

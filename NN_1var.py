@@ -32,8 +32,20 @@ def NRMSE(y_true, y_pred):
 
 # Parameters
 n_lags = 10
-targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
-
+targets = [
+    'xmeas_1',   # Very good 1var fit
+    'xmeas_7',  # Not that good 1var fit
+    # 'xmeas_10',  # Very good 1var fit
+    # 'xmeas_12',  # Very good 1var fit
+    # 'xmeas_13',  # Not that good 1var fit
+    # 'xmeas_15',  # Very good 1var fit
+    # 'xmeas_16',  # Not that good 1var fit
+    # 'xmeas_17',  # Very good 1var fit
+    # 'xmeas_18',  # Not that good 1var fit
+    # 'xmeas_19',  # Not that good 1var fit
+    # 'xmeas_20',  # Not that good 1var fit
+    # 'xmeas_21',  # Not that good 1var fit
+]
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
 for target in targets:
@@ -72,6 +84,19 @@ print(f"Test size: {len(test_df)}")
 # Number of features
 num_features = len(xmv_variables) + 1  # 11 xmv variables + 1 target variable
 
+# ---- Prepare for plotting results ----
+# Create a figure and axis array (3 columns, with enough rows to hold all targets)
+n_cols = len(targets) if len(targets) < 3 else 3
+n_rows = int(np.ceil(len(targets) / n_cols))
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 5 * n_rows), sharex=True)
+fig.suptitle(f'n_lags={n_lags}, 1var models')
+if len(targets) != 1:
+    axes = axes.flatten()
+    for i in range(len(targets), n_rows * n_cols):  # Hide unused axes
+        axes[i].axis('off')
+else:
+    axes = [axes]
+
 # --------- Simple NN constructor -------------
 
 def create_simple_NN(input_shape, hidden_layer_sizes, dropout_rate=0.1):
@@ -89,17 +114,15 @@ def create_simple_NN(input_shape, hidden_layer_sizes, dropout_rate=0.1):
 
     return Model(inputs=inputs, outputs=outputs)
 
-# -----------------------------------------------------------
-
-for target in targets:
-
+# ---- Main loop ----
+for idx, target in enumerate(targets):
+    ax = axes[idx]
     # Define predictors: - xmvs from time t-n_lags to t (!!!)
     #                    - xmeas from time t-(n_lags+1) to t-1
     predictors = [f"{target}_lag{i}" for i in range(1, n_lags + 1)]
     for var in xmv_variables:
         predictors.extend([f"{var}_lag{i}" for i in range(0, n_lags)])
 
-    # Reshape data to fit LSTM model (samples, timesteps, features)
     X_train = train_df[predictors].values
     y_train = train_df[target].values
     X_val = val_df[predictors].values
@@ -121,6 +144,7 @@ for target in targets:
 
     # Compile the model
     model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    model.summary()
 
     # Train the model
     history = model.fit(
@@ -175,13 +199,10 @@ for target in targets:
     actual_values = y_test[:plot_samples]
     predicted_values = predictions[:plot_samples]
 
-    # Create a figure and axis object
-    fig, ax = plt.subplots()
-    fig.suptitle(f'NN: n={n_lags}, tar={target}')
-
     # Plot actual and predicted values
     ax.plot(np.arange(len(predicted_values)), actual_values, label='Actual')
     ax.plot(np.arange(len(predicted_values)), predicted_values, label='Predicted')
+    ax.set_title(f'n_lags={n_lags}, target={target}')
 
     # Add grid, legend, and NRMSE text
     ax.grid(True)
@@ -189,9 +210,8 @@ for target in targets:
     ax.text(0.985, 0.02, f'NRMSE: {nrmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
             color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
-    # Save the plot
-    plt.savefig(f'plots/NN_1var_{target}_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight',
-                pad_inches=0.1)
+# Save the plot
+plt.savefig(f'plots/NN_1var_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
-    # Show the plot
-    plt.show()
+# Show the plot
+plt.show()

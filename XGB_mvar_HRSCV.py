@@ -31,8 +31,8 @@ targets = [
     'xmeas_12',  # Very good 1var fit
     'xmeas_13',  # Not that good 1var fit
     'xmeas_15',  # Very good 1var fit
-    'xmeas_17',  # Very good 1var fit
     'xmeas_16',  # Not that good 1var fit
+    'xmeas_17',  # Very good 1var fit
     'xmeas_18',  # Not that good 1var fit
     'xmeas_19',  # Not that good 1var fit
     'xmeas_20',  # Not that good 1var fit

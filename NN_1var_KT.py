@@ -32,7 +32,20 @@ def NRMSE(y_true, y_pred):
 
 # Parameters
 n_lags = 10
-targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+targets = [
+    'xmeas_1',   # Very good 1var fit
+    'xmeas_7',  # Not that good 1var fit
+    # 'xmeas_10',  # Very good 1var fit
+    # 'xmeas_12',  # Very good 1var fit
+    # 'xmeas_13',  # Not that good 1var fit
+    # 'xmeas_15',  # Very good 1var fit
+    # 'xmeas_16',  # Not that good 1var fit
+    # 'xmeas_17',  # Very good 1var fit
+    # 'xmeas_18',  # Not that good 1var fit
+    # 'xmeas_19',  # Not that good 1var fit
+    # 'xmeas_20',  # Not that good 1var fit
+    # 'xmeas_21',  # Not that good 1var fit
+]
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -122,5 +135,5 @@ for target in targets:
                  verbose=2)
 
     # Print the best hyperparameters
-    print('Best hyperparameters:')
+    print(f"Best hyperparameters for {target}:")
     print(tuner.get_best_hyperparameters()[0].values)

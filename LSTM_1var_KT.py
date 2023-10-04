@@ -28,7 +28,7 @@ def normalize_data(df):
 
 # Parameters
 n_lags = 10
-targets = ['xmeas_1'] #[f'xmeas_{i}' for i in range(1, 41+1)]
+targets = ['xmeas_1']
 
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -116,5 +116,5 @@ for target in targets:
                  verbose=2)
 
     # Print the best hyperparameters
-    print('Best hyperparameters:')
+    print(f"Best hyperparameters for {target}:")
     print(tuner.get_best_hyperparameters()[0].values)

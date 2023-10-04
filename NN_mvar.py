@@ -1,11 +1,20 @@
-# Description: XGBoost model for multiple targets
+# Keras NN for 1 variable
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Do not use GPU
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import xgboost as xgb
+import tensorflow as tf
+from tensorflow import keras
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout
 from sklearn.metrics import mean_squared_error
+
+# Check if GPU is available
+print(tf.config.experimental.list_physical_devices('GPU')) # If empty, GPU is not available
 
 # Load data
 df_train_OG = pd.read_csv('data/faultfreetraining.txt')
@@ -26,7 +35,6 @@ def NRMSE(y_true, y_pred):
 
 # Parameters
 n_lags = 10
-# Including targets with relatively good 1var fit
 targets = [
     'xmeas_1',   # Very good 1var fit
     'xmeas_7',  # Not that good 1var fit
@@ -34,8 +42,8 @@ targets = [
     'xmeas_12',  # Very good 1var fit
     'xmeas_13',  # Not that good 1var fit
     'xmeas_15',  # Very good 1var fit
-    'xmeas_17',  # Very good 1var fit
     'xmeas_16',  # Not that good 1var fit
+    'xmeas_17',  # Very good 1var fit
     'xmeas_18',  # Not that good 1var fit
     'xmeas_19',  # Not that good 1var fit
     'xmeas_20',  # Not that good 1var fit
@@ -77,7 +85,31 @@ print(f"Train size: {len(train_df)}")
 print(f"Val size: {len(val_df)}")
 print(f"Test size: {len(test_df)}")
 
-# Define predictors: xmvs from time t-n_lags to t (!!!), and xmeas from time t-n_lags to t-1
+# Number of features
+num_features = len(xmv_variables) + len(targets)
+num_targets = len(targets)
+
+# --------- Simple NN constructor -------------
+
+def create_simple_NN(input_shape, output_shape, hidden_layer_sizes, dropout_rate=0.1):
+
+    # Create the input layer
+    inputs = Input(shape=input_shape)
+
+    # Hidden layers
+    for i in range(len(hidden_layer_sizes)):
+        x = Dense(hidden_layer_sizes[i], activation='relu')(inputs)
+        x = Dropout(dropout_rate)(x)
+
+    # Output layer for regression
+    outputs = Dense(output_shape)(x)
+
+    return Model(inputs=inputs, outputs=outputs)
+
+# -------------------------------------------
+
+# Define predictors: - xmvs from time t-n_lags to t (!!!)
+#                    - xmeas from time t-(n_lags+1) to t-1
 predictors = []
 for target in targets:
     predictors.extend([f"{target}_lag{i}" for i in range(1, n_lags + 1)])
@@ -91,14 +123,39 @@ y_val = val_df[targets].values
 X_test = test_df[predictors].values
 y_test = test_df[targets].values
 
-# Create XGBoost model
-model = xgb.XGBRegressor()
+# Hyperparameters for the model
+input_shape = (X_train.shape[1])  # n_lags * num_features
+hidden_layer_sizes = [32,32]#[192,96,256,224]
+dropout_rate = 0
+batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
 
-# Train XGBoost model
-model.fit(X_train, y_train)
+# Create the model
+model = create_simple_NN(input_shape=input_shape,
+                         output_shape=num_targets,
+                         hidden_layer_sizes=hidden_layer_sizes,
+                         dropout_rate=dropout_rate,
+                         )
+
+# Compile the model
+model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+model.summary()
+
+# Train the model
+history = model.fit(
+    x=X_train,
+    y=y_train,
+    validation_data=(X_val, y_val),
+    batch_size=batch_size,
+    epochs=2,
+    verbose=1,
+    shuffle=False,
+    callbacks=[
+        keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, mode='min')
+    ]
+)
 
 # Save model
-model.save_model(f'models/XGB_mvar_n_lags_{n_lags}.json')
+model.save(f'models/LSTM_mvar_{target}_n_{n_lags}.h5')
 
 # Score the model on validation set
 print(f"NRMSE on val. set: "
@@ -120,9 +177,10 @@ for i in range(predict_n_steps):
             else:
                 input_data[f"{var}_lag{lag}"] = test_df[f"{var}_lag{lag}"].iloc[i]
     input_df = pd.DataFrame([input_data])
+    input_tensor = input_df.to_numpy(dtype='float32')
 
     # Make a prediction
-    prediction = model.predict(input_df)[0]
+    prediction = model.predict(input_tensor)[0]
     predictions.append(prediction)
 
     # Update xmeas lags with the new prediction
@@ -151,7 +209,7 @@ for target in targets:
 
 # Plotting
 # Determine the number of rows needed
-n_rows = int(np.ceil(len(targets) / 3.0))
+n_rows = int(np.ceil(num_targets / 3.0))
 fig, axes = plt.subplots(n_rows, 3, figsize=(15, 5 * n_rows), sharex=True)
 fig.suptitle(f'n_lags={n_lags}, multitarget')
 
@@ -159,7 +217,7 @@ fig.suptitle(f'n_lags={n_lags}, multitarget')
 axes = axes.flatten()
 
 # Hide any extra subplot axes that are not needed
-for i in range(len(targets), n_rows * 3):
+for i in range(num_targets, n_rows * 3):
     axes[i].axis('off')
 
 plot_samples = 150
@@ -172,19 +230,19 @@ for idx, target in enumerate(targets):
 
     ax.plot(np.arange(len(predicted_values)), actual_values, label='Actual')
     ax.plot(np.arange(len(predicted_values)), predicted_values, label='Predicted')
-    ax.set_title(f'n_lags={n_lags}(+1), target={target}')
+    ax.set_title(f'n_lags={n_lags}, target={target}')
 
     # Add grid, legend, and RMSE text
     ax.grid(True)
     ax.legend(loc=1)
-    ax.text(0.985, 0.02, f'RMSE: {nrmse_values[target]:.4f}',
+    ax.text(0.985, 0.02, f'NRMSE: {nrmse_values[target]:.4f}',
             transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
             color='black',
             bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
 
 # Save the plot
-plt.savefig(f'plots/XGB_mvar_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+plt.savefig(f'plots/NN_mvar_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
 # Show the plot
 plt.show()
