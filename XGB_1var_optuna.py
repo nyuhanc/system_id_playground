@@ -61,7 +61,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))

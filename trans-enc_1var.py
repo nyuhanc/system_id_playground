@@ -49,7 +49,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-test split (80/20)
 train_size = int(0.8 * len(df))
@@ -197,7 +197,7 @@ for target in targets:
             color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
     # Save the plot
-    plt.savefig(f'plots/trans_1var_{target:02}_n_lags_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight',
+    plt.savefig(f'plots/trans_1var_{target}_n_{n_lags}.pdf', format='pdf', dpi=1200, bbox_inches='tight',
                 pad_inches=0.1)
 
     # Show the plot

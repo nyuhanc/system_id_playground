@@ -152,7 +152,7 @@ ax.legend(loc=1)
 ax.text(0.985, 0.02, f'RMSE: {rmse_value:.4f}', transform=ax.transAxes, ha='right', va='bottom', fontsize=10, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.3'))
 
 # Save the plot
-plt.savefig(f'plots/xgb_1var_{target:02}_n_lags_{np.max(lags_target)}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
+plt.savefig(f'plots/xgb_1var_{target:02}_n_{np.max(lags_target)}.pdf', format='pdf', dpi=1200, bbox_inches='tight', pad_inches=0.1)
 
 # Show the plot
 plt.show()

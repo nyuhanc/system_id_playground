@@ -9,6 +9,7 @@ from tensorflow import keras
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout
 from sklearn.metrics import mean_squared_error
+from keras.optimizers import Adam
 
 # Check if GPU is available
 print(tf.config.experimental.list_physical_devices('GPU')) # If empty, GPU is not available
@@ -35,16 +36,16 @@ n_lags = 10
 targets = [
     'xmeas_1',   # Very good 1var fit
     'xmeas_7',  # Not that good 1var fit
-    # 'xmeas_10',  # Very good 1var fit
-    # 'xmeas_12',  # Very good 1var fit
-    # 'xmeas_13',  # Not that good 1var fit
-    # 'xmeas_15',  # Very good 1var fit
-    # 'xmeas_16',  # Not that good 1var fit
-    # 'xmeas_17',  # Very good 1var fit
-    # 'xmeas_18',  # Not that good 1var fit
-    # 'xmeas_19',  # Not that good 1var fit
-    # 'xmeas_20',  # Not that good 1var fit
-    # 'xmeas_21',  # Not that good 1var fit
+    'xmeas_10',  # Very good 1var fit
+    'xmeas_12',  # Very good 1var fit
+    'xmeas_13',  # Not that good 1var fit
+    'xmeas_15',  # Very good 1var fit
+    'xmeas_16',  # Not that good 1var fit
+    'xmeas_17',  # Very good 1var fit
+    'xmeas_18',  # Not that good 1var fit
+    'xmeas_19',  # Not that good 1var fit
+    'xmeas_20',  # Not that good 1var fit
+    'xmeas_21',  # Not that good 1var fit
 ]
 # Generate lagged features for target
 df_train = normalize_data(df_train_OG.copy())
@@ -62,7 +63,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -104,9 +105,13 @@ def create_simple_NN(input_shape, hidden_layer_sizes, dropout_rate=0.1):
     # Create the input layer
     inputs = Input(shape=input_shape)
 
+
+    x = inputs  # Initialize x to be inputs for the first layer
+
     # Hidden layers
     for i in range(len(hidden_layer_sizes)):
-        x = Dense(hidden_layer_sizes[i], activation='relu')(inputs)
+        print(i)
+        x = Dense(hidden_layer_sizes[i], activation='relu')(x)
         x = Dropout(dropout_rate)(x)
 
     # Output layer for regression
@@ -131,8 +136,8 @@ for idx, target in enumerate(targets):
     y_test = test_df[target].values
 
     # Hyperparameters for the model
-    input_shape = (X_train.shape[1])  # n_lags * num_features
-    hidden_layer_sizes = [192,96,256,224]
+    input_shape = X_train.shape[1]  # n_lags * num_features
+    hidden_layer_sizes = [224,256,32,160]
     dropout_rate = 0
     batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
 
@@ -143,7 +148,7 @@ for idx, target in enumerate(targets):
                              )
 
     # Compile the model
-    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    model.compile(optimizer=Adam(learning_rate=1e-3), loss='mse', metrics=['mae'])
     model.summary()
 
     # Train the model
@@ -161,7 +166,7 @@ for idx, target in enumerate(targets):
     )
 
     # Save model
-    model.save(f'models/NN_1var_{target}_n_lags_{n_lags}.h5')
+    model.save(f'models/NN_1var_{target}_n_{n_lags}.h5')
 
     # Score the model on validation set
     print(f"NRMSE on val. set: "

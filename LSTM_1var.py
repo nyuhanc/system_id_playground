@@ -63,7 +63,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -103,7 +103,8 @@ def create_lstm_model(input_shape, lstm_layers=[50, 50], dropout_rate=0.1, state
 
     inputs = Input(batch_shape=(batch_size, input_shape[0], input_shape[1]))
 
-    x = inputs  # (batch_size, seq_len, num_features)
+    x = inputs  # Initialize x to be inputs for the first layer
+
     for i, units in enumerate(lstm_layers):
         return_seq = True if i < len(lstm_layers) - 1 else False  # Only the last layer should return_sequences=False
         x = LSTM(units, return_sequences=return_seq, stateful=stateful)(x)

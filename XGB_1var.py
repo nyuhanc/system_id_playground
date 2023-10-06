@@ -57,7 +57,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -129,7 +129,7 @@ for idx, target in enumerate(targets):
     model.fit(X_train, y_train)
 
     # Save model
-    model.save_model(f'models/XGB_1var_{target}_n_lags_{n_lags}.json')
+    model.save_model(f'models/XGB_1var_{target}_n_{n_lags}.json')
 
     # Score the model on validation set
     print(f"NRMSE on val. set: "

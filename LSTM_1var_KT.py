@@ -46,7 +46,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -115,6 +115,10 @@ for target in targets:
                  callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')],
                  verbose=2)
 
-    # Print the best hyperparameters
-    print(f"Best hyperparameters for {target}:")
-    print(tuner.get_best_hyperparameters()[0].values)
+    # Print the best model structure
+    best_trials = tuner.oracle.get_best_trials(num_trials=1)
+    for t in best_trials:
+        print("Trial summary")
+        print(t.summary())
+        print("Trial hyperparameters")
+        print(t.hyperparameters.values)

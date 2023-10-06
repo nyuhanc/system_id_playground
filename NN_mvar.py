@@ -1,7 +1,4 @@
-# Keras NN for 1 variable
-
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Do not use GPU
+# Keras NN for multivariable output
 
 import numpy as np
 import pandas as pd
@@ -12,6 +9,7 @@ from tensorflow import keras
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout
 from sklearn.metrics import mean_squared_error
+from keras.optimizers import Adam
 
 # Check if GPU is available
 print(tf.config.experimental.list_physical_devices('GPU')) # If empty, GPU is not available
@@ -66,7 +64,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -96,9 +94,11 @@ def create_simple_NN(input_shape, output_shape, hidden_layer_sizes, dropout_rate
     # Create the input layer
     inputs = Input(shape=input_shape)
 
+    x = inputs  # Initialize x to be inputs for the first layer
+
     # Hidden layers
     for i in range(len(hidden_layer_sizes)):
-        x = Dense(hidden_layer_sizes[i], activation='relu')(inputs)
+        x = Dense(hidden_layer_sizes[i], activation='relu')(x)
         x = Dropout(dropout_rate)(x)
 
     # Output layer for regression
@@ -124,9 +124,9 @@ X_test = test_df[predictors].values
 y_test = test_df[targets].values
 
 # Hyperparameters for the model
-input_shape = (X_train.shape[1])  # n_lags * num_features
-hidden_layer_sizes = [32,32]#[192,96,256,224]
-dropout_rate = 0
+input_shape = X_train.shape[1]  # n_lags * num_features
+hidden_layer_sizes = [96]
+dropout_rate = 0.4
 batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
 
 # Create the model
@@ -137,7 +137,7 @@ model = create_simple_NN(input_shape=input_shape,
                          )
 
 # Compile the model
-model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+model.compile(optimizer=Adam(learning_rate=1e-3), loss='mse', metrics=['mae'])
 model.summary()
 
 # Train the model

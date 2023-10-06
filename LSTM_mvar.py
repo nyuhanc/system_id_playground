@@ -1,5 +1,9 @@
 # Keras LSTM for multiple variable
 
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Do not use GPU
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -63,7 +67,7 @@ for var in xmv_variables:
 df = df_train.dropna()
 
 # Defragment the dataframe
-df_train = df_train.copy()
+df = df.copy()
 
 # Train-val-test split (80/19/1), but all dividable with 512 (chosen as max batch size)
 train_size = int(0.8 * len(df))
@@ -91,7 +95,8 @@ def create_lstm_model(input_shape, output_shape, lstm_layers=[50, 50], dropout_r
 
     inputs = Input(batch_shape=(batch_size, input_shape[0], input_shape[1]))
 
-    x = inputs  # (batch_size, seq_len, num_features)
+    x = inputs  # Initialize x to be inputs for the first layer
+
     for i, units in enumerate(lstm_layers):
         return_seq = True if i < len(lstm_layers) - 1 else False  # Only the last layer should return_sequences=False
         x = LSTM(units, return_sequences=return_seq, stateful=stateful)(x)
@@ -122,7 +127,7 @@ y_test = test_df[targets].values.reshape(-1, num_targets)
 
 # Hyperparameters for the model
 input_shape = (X_train.shape[1], X_train.shape[2])  # (n_lags, features)
-lstm_layers = [96, 96, 64]
+lstm_layers = [128,32,416,128]
 dropout_rate = 0
 stateful = False  # stateful LSTM !!!!!
 batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
@@ -146,7 +151,7 @@ history = model.fit(
     y=y_train,
     validation_data=(X_val, y_val),
     batch_size=batch_size,  # Must satisfy 512 % batch_size == 0
-    epochs=2,
+    epochs=100,
     shuffle=False,  # Important! Do not shuffle the data when stateful=True
     callbacks=[
         keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, mode='min')
