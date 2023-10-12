@@ -126,7 +126,7 @@ y_test = test_df[targets].values
 # Hyperparameters for the model
 input_shape = X_train.shape[1]  # n_lags * num_features
 hidden_layer_sizes = [96]
-dropout_rate = 0.4
+dropout_rate = 0.15
 batch_size = 32  # Must satisfy 512 % batch_size == 0 (look at the train-val-test split above)
 
 # Create the model

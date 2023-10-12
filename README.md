@@ -1,7 +1,7 @@
 # Instructions
 This repo contains multiple scripts that can be used to train and test a different data-driven models for the 
 prediction of the time series, such as the classical ARX (yet to be implemented), the popular and efficient XGBoost, and different variants
-of NNs, such as classic NNs, LSTMs and even some more advanced models that are based on the attention mechanism (yet to be
+of NNs, such as classic NNs (MLPs), LSTMs and even some more advanced models that are based on the attention mechanism (yet to be
 implemented). The model hyperparameters are tuned using various libraries, such as Optuna, Kerastuner and Scikit.
 
 The data is taken from the Tenesse Eastman Process (TEP) dataset, which is a benchmark dataset for fault detection
@@ -15,5 +15,8 @@ Before using the data, the data has to be converted from .mat to.csv and placed 
 The regressors of the exogenous variable(s) are taken from t=0,...,-(n_lags-1). This is due to the properties
 of the data. For general purposes, the regressors of the exogenous variable(s) should as well be taken from 
 t=-1,...,-n_lags.
-
-- NRMSE is pretty much the same as RMSE since the data is z-normalized. 
+- NRMSE is pretty much the same as RMSE since the data is z-normalized beforehand 
+- The Keras features are combined with Tensorflow backend to run on GPU. The XGBoost is run on CPU but can also be
+run on GPU; an example is implemented in the XGB_optuna script. For cuda to work, (install and) check your nvidia and
+cuda drivers versions compatibility (enough for XGBoost to work). For tensorflow, also install the right versions of
+cudnn and tensorflow (e.g. https://youtu.be/4LvgOmxugFU?si=0X8ayETwhJyWb3Fi).

@@ -30,14 +30,18 @@ def normalize_data(df):
             df[col] = (df[col] - df[col].mean()) / df[col].std()
     return df
 
+device = 'cpu' # 'cpu' or 'cuda' for gpu
+
 # System Parameters
 n_lags = 10
 targets = ['xmeas_1']
 
 # Search Parameters
 par_n_trials = 1000  # number of trials
-par_min_resource = 100  # minimum number of boosting rounds (n_estimators)
-par_max_resource = 500  # maximum number of boosting rounds (n_estimators)
+
+# In the  case we want to use manually increasing number of boosting rounds (see objective function)
+par_min_resource = 200  # minimum number of boosting rounds (n_estimators)
+par_max_resource = 1000  # maximum number of boosting rounds (n_estimators)
 
 # Define a function that takes a value x from 0 to n_trials and returns n_estimators
 # that increases from min_resource to max_resource in an exponential manner
@@ -93,13 +97,16 @@ for target in targets:
     y_val = val_df[target].values
 
     def objective(trial):
-        # Get the current resource budget for this trial
-        trial_num = trial.number
 
-        # Define n_estimators based on the current resource budget
-        n_estimators = budget_func(trial_num)
-        trial.set_user_attr("n_estimators", n_estimators) # save n_estimators to trial object
-        print(f"Trial {trial_num}: n_estimators = {n_estimators}")
+        # Use a high number of boosting rounds; optuna will automaticaly stop boosting
+        # iter. if the score will fail to improve (some early stopping is used)
+        n_estimators =  par_max_resource # 1000
+
+        # Uncomment to use manually increasing number of boosting rounds
+        # # Define n_estimators based on the current resource budget
+        # n_estimators = budget_func(trial.number)
+        # trial.set_user_attr("n_estimators", n_estimators) # save n_estimators to trial object
+        # print(f"Trial {trial_num}: n_estimators = {n_estimators}")
 
         # Define hyperparameter search space using trial object
         param = {
@@ -112,28 +119,33 @@ for target in targets:
             'early_stopping_rounds': 50,  # This parameter is set to stop training when validation score stops improving
             "lambda": trial.suggest_float("lambda", 1e-8, 1.0, log=True),
             "alpha": trial.suggest_float("alpha", 1e-8, 1.0, log=True),
-            #########################
-            'device': 'cuda',
+            'max_depth' : trial.suggest_int("max_depth", 4, 10),
+            'min_child_weight' : trial.suggest_int("min_child_weight", 2, 10),
+            'eta' : trial.suggest_float("eta", 1e-8, 1.0, log=True),
+            'gamma' : trial.suggest_float("gamma", 1e-8, 1.0, log=True),
+            'grow_polic' : trial.suggest_categorical("grow_policy", ["depthwise", "lossguide"]),
+            'device': device,
         }
 
-        if param["booster"] == "gbtree" or param["booster"] == "dart":
-            param["max_depth"] = trial.suggest_int("max_depth", 4, 10)
-            # minimum child weight, larger the term more conservative the tree.
-            param["min_child_weight"] = trial.suggest_int("min_child_weight", 2, 10)
-            param["eta"] = trial.suggest_float("eta", 1e-8, 1.0, log=True)
-            param["gamma"] = trial.suggest_float("gamma", 1e-8, 1.0, log=True)
-            param["grow_policy"] = trial.suggest_categorical("grow_policy", ["depthwise", "lossguide"])
+        if device == 'cpu':
+            model = xgb.XGBRegressor(**param)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=1)  # could also use xgb.cv
+            y_pred = model.predict(X_val)
+        elif device == 'cuda':
 
-        if param["booster"] == "dart":
-            param["sample_type"] = trial.suggest_categorical("sample_type", ["uniform", "weighted"])
-            param["normalize_type"] = trial.suggest_categorical("normalize_type", ["tree", "forest"])
-            param["rate_drop"] = trial.suggest_float("rate_drop", 1e-8, 1.0, log=True)
-            param["skip_drop"] = trial.suggest_float("skip_drop", 1e-8, 1.0, log=True)
+            # Convert data to DMatrix format
+            dtrain = xgb.DMatrix(X_train, label=y_train.reshape(-1, 1))
+            dval = xgb.DMatrix(X_val, label=y_val.reshape(-1, 1))
+            evals = [(dtrain, 'train'), (dval, 'eval')]
 
-
-        model = xgb.XGBRegressor(**param)
-        model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=0)  # could also use xgb.cv
-        y_pred = model.predict(X_val)
+            # Note: 'fit' is renamed to 'train' in xgb.train for GPU
+            # Note: 'n_estimators' is renamed to 'num_boost_round' in xgb.train
+            # Note: 'early_stopping_rounds' is passed as a function argument, not a parameter
+            bst = xgb.train(param, dtrain, num_boost_round=n_estimators, evals=evals,
+                            early_stopping_rounds=param['early_stopping_rounds'], verbose_eval=1)
+            y_pred = bst.predict(dval)
+        else:
+            raise ValueError(f"Unknown device: {device} (should be 'cpu' or 'cuda')")
 
         return mean_squared_error(y_val, y_pred)
 
@@ -146,7 +158,7 @@ for target in targets:
     study.optimize(
         objective,
         n_trials=par_n_trials,
-        n_jobs=1, # Using more threads may cause my GPU to run out of memory
+        n_jobs=2 if device=='cuda' else -1, # Using more threads may cause my GPU to run out of memory (if using GPU)
         gc_after_trial=True, # Collect garbage after each trial to avoid GPU memory leak
     )
 
@@ -164,3 +176,29 @@ for target in targets:
     timestr = time.strftime("%m%d-%H%M")
     results = study.trials_dataframe()
     results.to_csv(f'results/xgb_OptunaHyperband_({timestr})_{target}.csv', index=False)
+
+    # Following https://www.kaggle.com/code/hamzaghanmi/xgboost-catboost-using-optuna#3.-XGBoost-using-Optuna-
+    # Plot the optimization history
+    fig = optuna.visualization.plot_optimization_history(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_optimization_history.png")
+
+    # Plot the importance of the parameters
+    fig = optuna.visualization.plot_param_importances(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_param_importances.png")
+
+    # Plot the slice plot
+    fig = optuna.visualization.plot_slice(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_slice_plot.png")
+
+    # Plot the parallel plot
+    fig = optuna.visualization.plot_parallel_coordinate(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_parallel_plot.png")
+
+    # Plot the contour plot
+    fig = optuna.visualization.plot_contour(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_contour_plot.png")
+
+    # Plot the edf plot
+    fig = optuna.visualization.plot_edf(study)
+    fig.write_image(f"results/xgb_OptunaHyperband_({timestr})_{target}_edf_plot.png")
+

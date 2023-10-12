@@ -145,3 +145,5 @@ for t in best_trials:
     print(t.summary())
     print("Trial hyperparameters")
     print(t.hyperparameters.values)
+
+
